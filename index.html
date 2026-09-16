@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>عجلة اتحاد الطلاب - Welcome 62</title>
+    <meta name="description" content="عجلة التحديات والأسئلة لفعالية اتحاد الطلاب - Welcome 62">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- Confetti canvas overlay -->
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- Top Navigation Bar -->
+    <header class="navbar">
+        <div class="brand-group">
+            <div class="logo-badge">🎓</div>
+            <div>
+                <h1 class="brand-title">عجلة اتحاد الطلاب</h1>
+                <p class="brand-subtitle">فعالية Welcome 62</p>
+            </div>
+        </div>
+        <div class="nav-actions">
+            <button id="soundToggle" class="icon-btn" title="إيقاف الصوت">🔊</button>
+        </div>
+    </header>
+
+    <!-- Clean Focused Wheel Container -->
+    <main class="main-container">
+
+        <!-- Wheel Stage Card -->
+        <section class="wheel-stage-card">
+            
+            <div class="wheel-container-wrapper">
+                <!-- Outer LED Bezel Ring with pulsing bulb lights -->
+                <div class="led-bezel" id="ledBezel"></div>
+
+                <!-- Pointer Needle SVG -->
+                <div class="pointer-box" id="pointerBox">
+                    <svg viewBox="0 0 36 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 44L0 6C0 2.68629 8.05887 0 18 0C27.9411 0 36 2.68629 36 6L18 44Z" fill="url(#needleGrad)"/>
+                        <defs>
+                            <linearGradient id="needleGrad" x1="18" y1="0" x2="18" y2="44" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#FF5252"/>
+                                <stop offset="1" stop-color="#FF1744"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+
+                <!-- Interactive Wheel Canvas -->
+                <canvas id="wheelCanvas" width="320" height="320"></canvas>
+            </div>
+
+            <!-- Spin Trigger Button -->
+            <button id="spinBtn" class="spin-action-btn" onclick="spinWheel()">
+                <span>🎯</span>
+                <span>لف العجلة!</span>
+            </button>
+
+            <!-- Result Display Banner -->
+            <div class="result-banner">
+                <div class="result-banner-title">النتيجة الحالية</div>
+                <div class="result-banner-text" id="resultBannerText">اضغط "لف العجلة" لبدء التحدي!</div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Celebration Winner Overlay Modal -->
+    <div class="modal-overlay" id="winnerModal">
+        <div class="modal-card">
+            <div class="trophy-anim">🏆</div>
+            <div class="modal-winner-tag" id="modalWinnerTag"></div>
+            <p class="modal-winner-msg" id="modalWinnerMsg"></p>
+            <button class="modal-action-btn" onclick="closeModal()">استمرار 🚀</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
