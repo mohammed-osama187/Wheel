@@ -37,6 +37,40 @@ const sectors = [
     }
 ];
 
+// Challenge & Questions Pools for the 3 Envelopes
+const challengePools = {
+    "سؤال عن الكلية": [
+        "اذكر اسم 3 دكاترة بتدرسلهم في الكلية السنة دي! 📚",
+        "أكتر مادة حاسس إنها تقيلة وخايف منها وليه؟ 😅",
+        "ايه هو مكانك المفضل في الكلية لما تكون عاوز تروق؟ ☕",
+        "مين أول صديق اتعرفت عليه في الكلية وأسلوب تعارفكم كان إزاي؟ 🤝",
+        "لو تقدر تغير حاجة واحدة في جدول المحاضرات، هتغير ايه؟ 🗓️",
+        "ايه أكتر موقف مضحك حصلك جوة مدرج الكلية؟ 😂",
+        "قول اسم 3 أقسام أو تخصصات موجودة في كليتنا! 🏛️",
+        "ايه هي أكتر قاعة محاضرات بترتاح فيها وليه؟ 🏫"
+    ],
+    "كسر الجليد": [
+        "احكي لنا عن أكتر أكلة بتحب تاكلها لما تكون متضايق! 🍕",
+        "لو كسبت 100 ألف جنيه دلوقتي حالا، أول حاجة هتشتريها ايه؟ 💰",
+        "ايه هي العادة الغريبة اللي بتعملها وما حدش يعرفها عنك؟ 🤫",
+        "لو هتختار تمثل في فيلم كوميدي، تحب تطلع شخصية مين؟ 🎬",
+        "قولنا ايه هي أمنيّتك الأولى للسنة الدراسية الجديدة؟ 🌟",
+        "لو اتعرض عليك تسافر أي بلد بكرة، تختار تروح فين ومع مين؟ ✈️",
+        "ايه أكتر موهبة مدفونة عندك نفسك الناس تعرفها؟ 🎤",
+        "ايه هو الشعار السري أو الحكمة اللي بتأمن بيها في حياتك؟ 💡"
+    ],
+    "تحدي كوميدي": [
+        "قلّد صوت أو حركة دكتور/معيد بدون ما تقول اسمه واللي واقفين يحذروا! 🎭",
+        "احكي نكتة سريعة وخلي 3 من صحابك يضحكوا! 😆",
+        "مثّل مشهد درامي حزين جداً وأنت بتطلب سندوتش فول وطعمية! 🎬",
+        "قول بيت شعر أو غنوة بصوت عالي كأنك في أوبرا! 🎼",
+        "أعمل 5 تمرين ضغط أو حركة كوميدية مضحكة قدام الناس! 🏋️‍♂️",
+        "قلّد ضحكة كرتونية مشهورة بصوت مرتفع لمدة 5 ثواني! 🤪",
+        "اتكلم باللغة العربية الفصحى المعقدة في كل كلامك لمدة دقيقة كاملة! 📜",
+        "اعمل إعلان مضحك وكوميدي على نظارتك أو ساعتك كانها اختراع خارق! ⌚"
+    ]
+};
+
 // Canvas & Controls Elements
 const canvas = document.getElementById("wheelCanvas");
 const ctx = canvas.getContext("2d");
@@ -50,6 +84,17 @@ const ledBezel = document.getElementById("ledBezel");
 const winnerModal = document.getElementById("winnerModal");
 const modalWinnerTag = document.getElementById("modalWinnerTag");
 const modalWinnerMsg = document.getElementById("modalWinnerMsg");
+
+// Envelope Modal Elements
+const envelopeModal = document.getElementById("envelopeModal");
+const envelopeCategoryTitle = document.getElementById("envelopeCategoryTitle");
+const revealedChallengeBox = document.getElementById("revealedChallengeBox");
+const revealedTag = document.getElementById("revealedTag");
+const revealedText = document.getElementById("revealedText");
+
+// Envelope State
+let currentEnvelopeChallenges = [];
+let isEnvelopeSelected = false;
 
 // Audio Context
 let audioCtx = null;
@@ -110,6 +155,26 @@ function playWinSound() {
     } catch (e) {}
 }
 
+function playEnvelopeOpenSound() {
+    if (!soundEnabled || !audioCtx) return;
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(260, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(750, audioCtx.currentTime + 0.35);
+        
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.35);
+    } catch (e) {}
+}
+
 // Sound Toggle Event
 soundToggle.addEventListener('click', () => {
     soundEnabled = !soundEnabled;
@@ -117,6 +182,91 @@ soundToggle.addEventListener('click', () => {
     soundToggle.title = soundEnabled ? "إيقاف الصوت" : "تشغيل الصوت";
     if (soundEnabled) initAudio();
 });
+
+// ... wheel animation logic ...
+
+function finishSpin(winningIndex) {
+    isSpinning = false;
+    spinBtn.disabled = false;
+
+    const winningSector = sectors[winningIndex];
+    const resultLabel = `${winningSector.icon || '⭐'} ${winningSector.label}`;
+
+    resultBannerText.innerText = resultLabel;
+    resultBannerText.style.color = "var(--cyan)";
+
+    // Check if sector triggers the 3 Envelopes system
+    if (challengePools[winningSector.label]) {
+        openEnvelopeModal(winningSector);
+    } else {
+        // Direct modal popup for instant gift or extra spin
+        modalWinnerTag.innerText = resultLabel;
+        modalWinnerMsg.innerText = winningSector.message || "";
+        winnerModal.classList.add("active");
+        playWinSound();
+        triggerConfetti();
+    }
+}
+
+function openEnvelopeModal(winningSector) {
+    const categoryName = winningSector.label;
+    const pool = challengePools[categoryName];
+    
+    // Pick 3 unique random challenges from pool
+    const shuffled = [...pool].sort(() => 0.5 - Math.random());
+    currentEnvelopeChallenges = shuffled.slice(0, 3);
+    
+    isEnvelopeSelected = false;
+
+    // Reset Envelopes UI state
+    envelopeCategoryTitle.innerText = `${winningSector.icon} ${categoryName}`;
+    revealedChallengeBox.classList.remove("active");
+    
+    const items = document.querySelectorAll(".envelope-item");
+    items.forEach(item => {
+        item.classList.remove("selected", "open", "fade-out");
+    });
+
+    envelopeModal.classList.add("active");
+}
+
+function selectEnvelope(selectedIndex) {
+    if (isEnvelopeSelected) return;
+    isEnvelopeSelected = true;
+    initAudio();
+    playEnvelopeOpenSound();
+
+    const items = document.querySelectorAll(".envelope-item");
+    items.forEach((item, idx) => {
+        if (idx === selectedIndex) {
+            item.classList.add("selected");
+            setTimeout(() => {
+                item.classList.add("open");
+            }, 300);
+        } else {
+            item.classList.add("fade-out");
+        }
+    });
+
+    // Reveal challenge details after flap animation
+    setTimeout(() => {
+        const chosenChallenge = currentEnvelopeChallenges[selectedIndex];
+        revealedText.innerText = chosenChallenge;
+        revealedTag.innerText = `🎭 الظرف رقم ${selectedIndex + 1}`;
+        revealedChallengeBox.classList.add("active");
+        playWinSound();
+        triggerConfetti();
+    }, 950);
+}
+
+function closeEnvelopeModal() {
+    envelopeModal.classList.remove("active");
+    isEnvelopeSelected = false;
+}
+
+function closeModal() {
+    winnerModal.classList.remove("active");
+}
 
 // Dynamic LED Bulbs Setup
 const TOTAL_LEDS = 16;
@@ -283,29 +433,6 @@ function spinWheel() {
     }
 
     requestAnimationFrame(animate);
-}
-
-function finishSpin(winningIndex) {
-    isSpinning = false;
-    spinBtn.disabled = false;
-
-    const winningSector = sectors[winningIndex];
-    const resultLabel = `${winningSector.icon || '⭐'} ${winningSector.label}`;
-
-    resultBannerText.innerText = resultLabel;
-    resultBannerText.style.color = "var(--cyan)";
-
-    // Modal popup with customized message per result
-    modalWinnerTag.innerText = resultLabel;
-    modalWinnerMsg.innerText = winningSector.message || "";
-    winnerModal.classList.add("active");
-
-    playWinSound();
-    triggerConfetti();
-}
-
-function closeModal() {
-    winnerModal.classList.remove("active");
 }
 
 // Confetti Particle System

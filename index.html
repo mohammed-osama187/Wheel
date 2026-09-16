@@ -81,6 +81,64 @@
         </div>
     </div>
 
+    <!-- Interactive 3-Envelopes Selection Modal -->
+    <div class="modal-overlay" id="envelopeModal">
+        <div class="envelope-modal-card">
+            <div class="envelope-header">
+                <span class="envelope-badge-icon">📩</span>
+                <h2 class="envelope-title" id="envelopeCategoryTitle">اختيار التحدي</h2>
+                <p class="envelope-subtitle">أمامك 3 ظروف مقفولة.. اختار ظرف عشان تكتشف حظك!</p>
+            </div>
+
+            <!-- Envelopes Grid -->
+            <div class="envelopes-grid" id="envelopesGrid">
+                <!-- Envelope 1 -->
+                <div class="envelope-item" data-index="0" onclick="selectEnvelope(0)">
+                    <div class="envelope-wrapper">
+                        <div class="envelope-flap"></div>
+                        <div class="envelope-pocket"></div>
+                        <div class="envelope-card-inner">
+                            <span class="card-icon">📜</span>
+                            <div class="card-text"></div>
+                        </div>
+                        <div class="envelope-number">1</div>
+                    </div>
+                </div>
+                <!-- Envelope 2 -->
+                <div class="envelope-item" data-index="1" onclick="selectEnvelope(1)">
+                    <div class="envelope-wrapper">
+                        <div class="envelope-flap"></div>
+                        <div class="envelope-pocket"></div>
+                        <div class="envelope-card-inner">
+                            <span class="card-icon">📜</span>
+                            <div class="card-text"></div>
+                        </div>
+                        <div class="envelope-number">2</div>
+                    </div>
+                </div>
+                <!-- Envelope 3 -->
+                <div class="envelope-item" data-index="2" onclick="selectEnvelope(2)">
+                    <div class="envelope-wrapper">
+                        <div class="envelope-flap"></div>
+                        <div class="envelope-pocket"></div>
+                        <div class="envelope-card-inner">
+                            <span class="card-icon">📜</span>
+                            <div class="card-text"></div>
+                        </div>
+                        <div class="envelope-number">3</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Revealed Content Container -->
+            <div class="revealed-challenge-box" id="revealedChallengeBox">
+                <div class="revealed-tag" id="revealedTag">🎭 الحكم المختار</div>
+                <div class="revealed-text" id="revealedText"></div>
+                <button class="modal-action-btn" onclick="closeEnvelopeModal()">نفذت التحدي! 🚀</button>
+            </div>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 
