@@ -1,5 +1,10 @@
-// Sectors Configuration (Removed "نصيحة الكبار")
-const sectors = [
+// Storage Keys & Defaults
+const STORAGE_SECTORS_KEY = "wheel_game_sectors_v1";
+const STORAGE_POOLS_KEY = "wheel_game_pools_v1";
+const STORAGE_PIN_KEY = "wheel_game_admin_pin_v1";
+const DEFAULT_PIN = "1234";
+
+const DEFAULT_SECTORS = [
     { 
         color: "#FF5252", 
         textColor: "#FFFFFF", 
@@ -37,8 +42,7 @@ const sectors = [
     }
 ];
 
-// Challenge & Questions Pools for the 3 Envelopes
-const challengePools = {
+const DEFAULT_CHALLENGE_POOLS = {
     "سؤال عن الكلية": [
         "اذكر اسم 3 دكاترة بتدرسلهم في الكلية السنة دي! 📚",
         "أكتر مادة حاسس إنها تقيلة وخايف منها وليه؟ 😅",
@@ -71,6 +75,31 @@ const challengePools = {
     ]
 };
 
+// Global Data State
+let sectors = [];
+let challengePools = {};
+
+function loadStateFromStorage() {
+    try {
+        const savedSectors = localStorage.getItem(STORAGE_SECTORS_KEY);
+        const savedPools = localStorage.getItem(STORAGE_POOLS_KEY);
+        
+        sectors = savedSectors ? JSON.parse(savedSectors) : JSON.parse(JSON.stringify(DEFAULT_SECTORS));
+        challengePools = savedPools ? JSON.parse(savedPools) : JSON.parse(JSON.stringify(DEFAULT_CHALLENGE_POOLS));
+    } catch (e) {
+        sectors = JSON.parse(JSON.stringify(DEFAULT_SECTORS));
+        challengePools = JSON.parse(JSON.stringify(DEFAULT_CHALLENGE_POOLS));
+    }
+}
+
+function saveStateToStorage() {
+    try {
+        localStorage.setItem(STORAGE_SECTORS_KEY, JSON.stringify(sectors));
+        localStorage.setItem(STORAGE_POOLS_KEY, JSON.stringify(challengePools));
+    } catch (e) {}
+    drawWheel();
+}
+
 // Canvas & Controls Elements
 const canvas = document.getElementById("wheelCanvas");
 const ctx = canvas.getContext("2d");
@@ -91,6 +120,29 @@ const envelopeCategoryTitle = document.getElementById("envelopeCategoryTitle");
 const revealedChallengeBox = document.getElementById("revealedChallengeBox");
 const revealedTag = document.getElementById("revealedTag");
 const revealedText = document.getElementById("revealedText");
+
+// Admin Elements
+const adminBtn = document.getElementById("adminBtn");
+const adminPinModal = document.getElementById("adminPinModal");
+const adminModal = document.getElementById("adminModal");
+const pinInput = document.getElementById("pinInput");
+const pinErrorMsg = document.getElementById("pinErrorMsg");
+const adminToast = document.getElementById("adminToast");
+
+// Color Picker Dual Sync
+const sectorColor = document.getElementById("sectorColor");
+const sectorColorText = document.getElementById("sectorColorText");
+const sectorTextColor = document.getElementById("sectorTextColor");
+const sectorTextColorText = document.getElementById("sectorTextColorText");
+
+if (sectorColor && sectorColorText) {
+    sectorColor.addEventListener("input", (e) => sectorColorText.value = e.target.value.toUpperCase());
+    sectorColorText.addEventListener("input", (e) => sectorColor.value = e.target.value);
+}
+if (sectorTextColor && sectorTextColorText) {
+    sectorTextColor.addEventListener("input", (e) => sectorTextColorText.value = e.target.value.toUpperCase());
+    sectorTextColorText.addEventListener("input", (e) => sectorTextColor.value = e.target.value);
+}
 
 // Envelope State
 let currentEnvelopeChallenges = [];
@@ -176,32 +228,36 @@ function playEnvelopeOpenSound() {
 }
 
 // Sound Toggle Event
-soundToggle.addEventListener('click', () => {
-    soundEnabled = !soundEnabled;
-    soundToggle.innerText = soundEnabled ? "🔊" : "🔇";
-    soundToggle.title = soundEnabled ? "إيقاف الصوت" : "تشغيل الصوت";
-    if (soundEnabled) initAudio();
-});
-
-// ... wheel animation logic ...
+if (soundToggle) {
+    soundToggle.addEventListener('click', () => {
+        soundEnabled = !soundEnabled;
+        soundToggle.innerText = soundEnabled ? "🔊" : "🔇";
+        soundToggle.title = soundEnabled ? "إيقاف الصوت" : "تشغيل الصوت";
+        if (soundEnabled) initAudio();
+    });
+}
 
 function finishSpin(winningIndex) {
     isSpinning = false;
     spinBtn.disabled = false;
 
     const winningSector = sectors[winningIndex];
+    if (!winningSector) return;
+
     const resultLabel = `${winningSector.icon || '⭐'} ${winningSector.label}`;
 
     resultBannerText.innerText = resultLabel;
     resultBannerText.style.color = "var(--cyan)";
 
-    // Check if sector triggers the 3 Envelopes system
-    if (challengePools[winningSector.label]) {
+    const pool = challengePools[winningSector.label];
+
+    // Check if sector triggers the 3 Envelopes system (pool exists & has elements)
+    if (pool && Array.isArray(pool) && pool.length > 0) {
         openEnvelopeModal(winningSector);
     } else {
         // Direct modal popup for instant gift or extra spin
         modalWinnerTag.innerText = resultLabel;
-        modalWinnerMsg.innerText = winningSector.message || "";
+        modalWinnerMsg.innerText = winningSector.message || "مبروك الفوز!";
         winnerModal.classList.add("active");
         playWinSound();
         triggerConfetti();
@@ -210,16 +266,28 @@ function finishSpin(winningIndex) {
 
 function openEnvelopeModal(winningSector) {
     const categoryName = winningSector.label;
-    const pool = challengePools[categoryName];
+    const pool = challengePools[categoryName] || [];
     
-    // Pick 3 unique random challenges from pool
+    if (pool.length === 0) {
+        modalWinnerTag.innerText = `${winningSector.icon || '⭐'} ${winningSector.label}`;
+        modalWinnerMsg.innerText = winningSector.message || "مبروك الفوز!";
+        winnerModal.classList.add("active");
+        playWinSound();
+        triggerConfetti();
+        return;
+    }
+
+    // Pick 3 random challenges from pool (handles small pools cleanly)
     const shuffled = [...pool].sort(() => 0.5 - Math.random());
-    currentEnvelopeChallenges = shuffled.slice(0, 3);
+    currentEnvelopeChallenges = [];
+    for (let i = 0; i < 3; i++) {
+        currentEnvelopeChallenges.push(shuffled[i % shuffled.length]);
+    }
     
     isEnvelopeSelected = false;
 
     // Reset Envelopes UI state
-    envelopeCategoryTitle.innerText = `${winningSector.icon} ${categoryName}`;
+    envelopeCategoryTitle.innerText = `${winningSector.icon || '📜'} ${categoryName}`;
     revealedChallengeBox.classList.remove("active");
     
     const items = document.querySelectorAll(".envelope-item");
@@ -250,7 +318,7 @@ function selectEnvelope(selectedIndex) {
 
     // Reveal challenge details after flap animation
     setTimeout(() => {
-        const chosenChallenge = currentEnvelopeChallenges[selectedIndex];
+        const chosenChallenge = currentEnvelopeChallenges[selectedIndex] || "تحدي ممتاز!";
         revealedText.innerText = chosenChallenge;
         revealedTag.innerText = `🎭 الظرف رقم ${selectedIndex + 1}`;
         revealedChallengeBox.classList.add("active");
@@ -273,6 +341,7 @@ const TOTAL_LEDS = 16;
 let ledElements = [];
 
 function createLEDBulbs() {
+    if (!ledBezel) return;
     ledBezel.innerHTML = '';
     ledElements = [];
     const radiusPercentage = 46;
@@ -309,6 +378,7 @@ let lastPassedSector = 0;
 let lastWinningIndex = -1;
 
 function setupCanvasDPI() {
+    if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * dpr;
@@ -317,6 +387,7 @@ function setupCanvasDPI() {
 }
 
 function drawWheel() {
+    if (!canvas || !ctx || sectors.length === 0) return;
     const dpr = window.devicePixelRatio || 1;
     const width = canvas.width / dpr;
     const height = canvas.height / dpr;
@@ -336,7 +407,7 @@ function drawWheel() {
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius, angle, angle + arc, false);
         ctx.lineTo(centerX, centerY);
-        ctx.fillStyle = sector.color;
+        ctx.fillStyle = sector.color || "#FF5252";
         ctx.fill();
 
         // Sector Divider Border Line
@@ -351,7 +422,10 @@ function drawWheel() {
         ctx.textAlign = "right";
         ctx.textBaseline = "middle";
         ctx.fillStyle = sector.textColor || "#FFFFFF";
-        ctx.font = "bold 13px 'Cairo', sans-serif";
+        
+        // Dynamic Font Size based on sector count
+        const fontSize = total > 8 ? 10 : (total > 6 ? 11 : 13);
+        ctx.font = `bold ${fontSize}px 'Cairo', sans-serif`;
 
         const text = `${sector.icon || '⭐'} ${sector.label}`;
         ctx.fillText(text, radius - 16, 0);
@@ -375,24 +449,20 @@ function spinWheel() {
     const total = sectors.length;
     const arc = (2 * Math.PI) / total;
 
-    // Pick a fair random winning sector index (avoid repeat if possible for variety)
+    // Fair random winning sector index
     let selectedIndex = Math.floor(Math.random() * total);
     if (selectedIndex === lastWinningIndex && total > 1) {
         selectedIndex = (selectedIndex + 1 + Math.floor(Math.random() * (total - 1))) % total;
     }
     lastWinningIndex = selectedIndex;
 
-    // Calculate target rotation so pointer at 1.5 * PI lands right in the middle of selectedIndex
     const startRotation = currentRotation;
     const pointerAngle = 1.5 * Math.PI;
     
-    // Middle angle of sector `selectedIndex` in canvas local coordinates is `(selectedIndex + 0.5) * arc`
-    // We want `(startRotation + delta + selectedIndex * arc + arc/2) % 2PI = 1.5 * PI`
     const sectorCenterLocal = (selectedIndex + 0.5) * arc;
     let deltaAngle = (pointerAngle - sectorCenterLocal - (startRotation % (2 * Math.PI))) % (2 * Math.PI);
     if (deltaAngle < 0) deltaAngle += 2 * Math.PI;
 
-    // Add 5 to 7 full 360-degree rotations
     const fullSpins = (5 + Math.floor(Math.random() * 3)) * 2 * Math.PI;
     const targetRotation = startRotation + fullSpins + deltaAngle;
 
@@ -437,10 +507,11 @@ function spinWheel() {
 
 // Confetti Particle System
 const confettiCanvas = document.getElementById("confetti-canvas");
-const cCtx = confettiCanvas.getContext("2d");
+const cCtx = confettiCanvas ? confettiCanvas.getContext("2d") : null;
 let confettiParticles = [];
 
 function resizeConfettiCanvas() {
+    if (!confettiCanvas) return;
     confettiCanvas.width = window.innerWidth;
     confettiCanvas.height = window.innerHeight;
 }
@@ -452,6 +523,7 @@ window.addEventListener('resize', () => {
 });
 
 function triggerConfetti() {
+    if (!confettiCanvas || !cCtx) return;
     resizeConfettiCanvas();
     confettiParticles = [];
     const colors = ["#ffd700", "#6c5ce7", "#00f2fe", "#ff5252", "#33d9b2", "#ffb142"];
@@ -503,7 +575,416 @@ function triggerConfetti() {
     requestAnimationFrame(renderConfetti);
 }
 
+// ==========================================================================
+// ADMIN PANEL FUNCTIONALITY
+// ==========================================================================
+
+function getAdminPin() {
+    return localStorage.getItem(STORAGE_PIN_KEY) || DEFAULT_PIN;
+}
+
+if (adminBtn) {
+    adminBtn.addEventListener('click', openAdminPinModal);
+}
+
+function openAdminPinModal() {
+    pinInput.value = "";
+    pinErrorMsg.innerText = "";
+    adminPinModal.classList.add("active");
+    setTimeout(() => pinInput.focus(), 200);
+}
+
+function closeAdminPinModal() {
+    adminPinModal.classList.remove("active");
+}
+
+function handlePinSubmit(e) {
+    e.preventDefault();
+    const enteredPin = pinInput.value.trim();
+    const currentPin = getAdminPin();
+
+    if (enteredPin === currentPin) {
+        closeAdminPinModal();
+        openAdminModal();
+    } else {
+        pinErrorMsg.innerText = "❌ رمز الـ PIN غير صحيح!";
+        pinInput.value = "";
+        pinInput.focus();
+    }
+}
+
+function openAdminModal() {
+    adminModal.classList.add("active");
+    switchAdminTab("sectors");
+}
+
+function closeAdminModal() {
+    adminModal.classList.remove("active");
+}
+
+function switchAdminTab(tabName) {
+    const tabs = ["sectors", "questions", "settings"];
+    tabs.forEach(t => {
+        const btn = document.getElementById(`tabBtn${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        const pane = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        if (btn) btn.classList.toggle("active", t === tabName);
+        if (pane) pane.classList.toggle("active", t === tabName);
+    });
+
+    if (tabName === "sectors") {
+        renderAdminSectors();
+    } else if (tabName === "questions") {
+        populateCategoryFilter();
+        renderAdminQuestions();
+    }
+}
+
+// Toast Helper
+function showAdminToast(msg) {
+    if (!adminToast) return;
+    adminToast.innerText = msg;
+    adminToast.classList.add("active");
+    setTimeout(() => adminToast.classList.remove("active"), 3000);
+}
+
+// --------------------------------------------------------------------------
+// Sector Management Logic
+// --------------------------------------------------------------------------
+
+function renderAdminSectors() {
+    const container = document.getElementById("adminSectorsList");
+    const countBadge = document.getElementById("sectorsCountBadge");
+    if (!container) return;
+
+    countBadge.innerText = `${sectors.length} قطاعات`;
+    container.innerHTML = "";
+
+    if (sectors.length === 0) {
+        container.innerHTML = '<div class="empty-state">لا توجد قطاعات حالياً! أضف قطاعاً جديداً بالكتلة أعلاه.</div>';
+        return;
+    }
+
+    sectors.forEach((sec, idx) => {
+        const hasQuestions = challengePools[sec.label] && challengePools[sec.label].length > 0;
+        const qCount = hasQuestions ? challengePools[sec.label].length : 0;
+
+        const row = document.createElement("div");
+        row.className = "sector-item-row";
+        row.innerHTML = `
+            <div class="sector-item-info">
+                <span class="sector-color-badge" style="background-color: ${sec.color};"></span>
+                <div>
+                    <div class="sector-item-title">${sec.icon || '⭐'} ${sec.label} (${qCount} أسئلة)</div>
+                    <div class="sector-item-msg">${sec.message ? sec.message : 'يستخدم الأسئلة والتحديات المخصصة'}</div>
+                </div>
+            </div>
+            <div class="item-actions">
+                <button class="btn-icon-action edit-btn" onclick="editSector(${idx})" title="تعديل">✏️</button>
+                <button class="btn-icon-action delete-btn" onclick="deleteSector(${idx})" title="حذف">🗑️</button>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+}
+
+function handleSaveSector(e) {
+    e.preventDefault();
+    const editIdx = parseInt(document.getElementById("sectorEditIndex").value, 10);
+    const label = document.getElementById("sectorLabel").value.trim();
+    const icon = document.getElementById("sectorIcon").value.trim();
+    const color = document.getElementById("sectorColor").value;
+    const textColor = document.getElementById("sectorTextColor").value;
+    const message = document.getElementById("sectorMessage").value.trim();
+
+    if (!label) return;
+
+    if (editIdx >= 0 && editIdx < sectors.length) {
+        const oldLabel = sectors[editIdx].label;
+        sectors[editIdx] = { label, icon, color, textColor, message };
+        
+        // Rename pool key if label changed
+        if (oldLabel !== label && challengePools[oldLabel]) {
+            challengePools[label] = challengePools[oldLabel];
+            delete challengePools[oldLabel];
+        }
+        showAdminToast("✅ تم تحديث القطاع بنجاح!");
+    } else {
+        sectors.push({ label, icon, color, textColor, message });
+        if (!challengePools[label]) {
+            challengePools[label] = [];
+        }
+        showAdminToast("🎉 تم إضافة القطاع الجديد!");
+    }
+
+    saveStateToStorage();
+    resetSectorForm();
+    renderAdminSectors();
+}
+
+function editSector(idx) {
+    if (idx < 0 || idx >= sectors.length) return;
+    const sec = sectors[idx];
+    document.getElementById("sectorEditIndex").value = idx;
+    document.getElementById("sectorLabel").value = sec.label;
+    document.getElementById("sectorIcon").value = sec.icon || "";
+    document.getElementById("sectorColor").value = sec.color || "#FF5252";
+    document.getElementById("sectorColorText").value = sec.color || "#FF5252";
+    document.getElementById("sectorTextColor").value = sec.textColor || "#FFFFFF";
+    document.getElementById("sectorTextColorText").value = sec.textColor || "#FFFFFF";
+    document.getElementById("sectorMessage").value = sec.message || "";
+
+    document.getElementById("sectorFormTitle").innerText = "✏️ تعديل بيانات القطاع";
+    document.getElementById("saveSectorBtn").innerText = "تحديث القطاع 💾";
+    document.getElementById("cancelSectorEditBtn").style.display = "inline-flex";
+
+    document.getElementById("sectorForm").scrollIntoView({ behavior: 'smooth' });
+}
+
+function resetSectorForm() {
+    document.getElementById("sectorEditIndex").value = "-1";
+    document.getElementById("sectorForm").reset();
+    document.getElementById("sectorFormTitle").innerText = "➕ إضافة قطاع جديد للعجلة";
+    document.getElementById("saveSectorBtn").innerText = "حفظ القطاع 💾";
+    document.getElementById("cancelSectorEditBtn").style.display = "none";
+}
+
+function deleteSector(idx) {
+    if (sectors.length <= 2) {
+        alert("يجب أن تظل العجلة تحتوي على قطاعين على الأقل!");
+        return;
+    }
+    const sec = sectors[idx];
+    if (confirm(`هل أنت تأكد من حذف قطاع "${sec.label}"؟`)) {
+        sectors.splice(idx, 1);
+        saveStateToStorage();
+        renderAdminSectors();
+        showAdminToast("🗑️ تم حذف القطاع!");
+    }
+}
+
+// --------------------------------------------------------------------------
+// Questions & Comedians Pool Management
+// --------------------------------------------------------------------------
+
+function populateCategoryFilter() {
+    const select = document.getElementById("categoryFilter");
+    if (!select) return;
+
+    const currentVal = select.value;
+    select.innerHTML = "";
+
+    sectors.forEach(sec => {
+        const opt = document.createElement("option");
+        opt.value = sec.label;
+        opt.innerText = `${sec.icon || '⭐'} ${sec.label}`;
+        select.appendChild(opt);
+    });
+
+    if (currentVal && sectors.some(s => s.label === currentVal)) {
+        select.value = currentVal;
+    }
+}
+
+function onCategoryFilterChange() {
+    resetQuestionForm();
+    renderAdminQuestions();
+}
+
+function renderAdminQuestions() {
+    const categorySelect = document.getElementById("categoryFilter");
+    const container = document.getElementById("adminQuestionsList");
+    const countBadge = document.getElementById("questionsCountBadge");
+    const searchVal = (document.getElementById("questionSearch").value || "").toLowerCase().trim();
+
+    if (!categorySelect || !container) return;
+    const selectedCategory = categorySelect.value;
+    if (!selectedCategory) {
+        container.innerHTML = '<div class="empty-state">اختر فئة لعرض الأسئلة والتحديات!</div>';
+        return;
+    }
+
+    const pool = challengePools[selectedCategory] || [];
+    let filtered = pool.map((q, idx) => ({ text: q, originalIdx: idx }));
+
+    if (searchVal) {
+        filtered = filtered.filter(item => item.text.toLowerCase().includes(searchVal));
+    }
+
+    countBadge.innerText = `${pool.length} سؤال/تحدي`;
+    container.innerHTML = "";
+
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="empty-state">لا توجد أسئلة أو تحديات في فئة "${selectedCategory}" حتى الآن!</div>`;
+        return;
+    }
+
+    filtered.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "question-item-card";
+        card.innerHTML = `
+            <div class="question-item-text">
+                <strong style="color: var(--cyan); margin-left: 6px;">#${item.originalIdx + 1}</strong> ${item.text}
+            </div>
+            <div class="item-actions">
+                <button class="btn-icon-action edit-btn" onclick="editQuestion(${item.originalIdx})" title="تعديل">✏️</button>
+                <button class="btn-icon-action delete-btn" onclick="deleteQuestion(${item.originalIdx})" title="حذف">🗑️</button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function handleSaveQuestion(e) {
+    e.preventDefault();
+    const categorySelect = document.getElementById("categoryFilter");
+    const selectedCategory = categorySelect ? categorySelect.value : "";
+    if (!selectedCategory) return;
+
+    const editIdx = parseInt(document.getElementById("questionEditIndex").value, 10);
+    const textInput = document.getElementById("questionTextInput");
+    const text = textInput.value.trim();
+
+    if (!text) return;
+
+    if (!challengePools[selectedCategory]) {
+        challengePools[selectedCategory] = [];
+    }
+
+    if (editIdx >= 0 && editIdx < challengePools[selectedCategory].length) {
+        challengePools[selectedCategory][editIdx] = text;
+        showAdminToast("✅ تم تحديث السؤال!");
+    } else {
+        challengePools[selectedCategory].push(text);
+        showAdminToast("🎉 تم إضافة السؤال الجديد!");
+    }
+
+    saveStateToStorage();
+    resetQuestionForm();
+    renderAdminQuestions();
+    renderAdminSectors(); // Update count badges in sectors
+}
+
+function editQuestion(idx) {
+    const categorySelect = document.getElementById("categoryFilter");
+    const selectedCategory = categorySelect ? categorySelect.value : "";
+    const pool = challengePools[selectedCategory] || [];
+
+    if (idx < 0 || idx >= pool.length) return;
+
+    document.getElementById("questionEditIndex").value = idx;
+    document.getElementById("questionTextInput").value = pool[idx];
+    document.getElementById("questionFormTitle").innerText = "✏️ تعديل السؤال / التحدي";
+    document.getElementById("saveQuestionBtn").innerText = "تحديث السؤال 💾";
+    document.getElementById("cancelQuestionEditBtn").style.display = "inline-flex";
+
+    document.getElementById("questionForm").scrollIntoView({ behavior: 'smooth' });
+}
+
+function resetQuestionForm() {
+    document.getElementById("questionEditIndex").value = "-1";
+    document.getElementById("questionForm").reset();
+    document.getElementById("questionFormTitle").innerText = "➕ إضافة سؤال / تحدي جديد للفئة المحددة";
+    document.getElementById("saveQuestionBtn").innerText = "إضافة السؤال ➕";
+    document.getElementById("cancelQuestionEditBtn").style.display = "none";
+}
+
+function deleteQuestion(idx) {
+    const categorySelect = document.getElementById("categoryFilter");
+    const selectedCategory = categorySelect ? categorySelect.value : "";
+    const pool = challengePools[selectedCategory] || [];
+
+    if (idx < 0 || idx >= pool.length) return;
+
+    if (confirm("هل أنت تأكد من حذف هذا السؤال / التحدي؟")) {
+        pool.splice(idx, 1);
+        saveStateToStorage();
+        renderAdminQuestions();
+        renderAdminSectors();
+        showAdminToast("🗑️ تم حذف السؤال!");
+    }
+}
+
+// --------------------------------------------------------------------------
+// Settings, PIN Change & Import/Export
+// --------------------------------------------------------------------------
+
+function handleChangePin(e) {
+    e.preventDefault();
+    const currentEntered = document.getElementById("currentPinInput").value.trim();
+    const newPin = document.getElementById("newPinInput").value.trim();
+    const actualPin = getAdminPin();
+
+    if (currentEntered !== actualPin) {
+        alert("رمز PIN الحالي غير صحيح!");
+        return;
+    }
+
+    if (!newPin || newPin.length < 3) {
+        alert("يرجى إدخال رمز PIN جديد مكون من 3 أرقام أو أكثر!");
+        return;
+    }
+
+    localStorage.setItem(STORAGE_PIN_KEY, newPin);
+    document.getElementById("changePinForm").reset();
+    showAdminToast("🔒 تم تغيير رمز الـ PIN بنجاح!");
+}
+
+function exportDataJSON() {
+    const data = {
+        sectors: sectors,
+        challengePools: challengePools,
+        exportedAt: new Date().toISOString()
+    };
+
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `wheel_game_backup_${new Date().toISOString().slice(0,10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    showAdminToast("📥 تم تحميل ملف النسخة الاحتياطية!");
+}
+
+function importDataJSON(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        try {
+            const parsed = JSON.parse(event.target.result);
+            if (parsed && Array.isArray(parsed.sectors) && parsed.challengePools) {
+                sectors = parsed.sectors;
+                challengePools = parsed.challengePools;
+                saveStateToStorage();
+                switchAdminTab("sectors");
+                showAdminToast("🎉 تم استرجاع كافة البيانات بنجاح!");
+            } else {
+                alert("ملف JSON غير صالح أو لا يحتوي على تنسيق العجلة الصحيح!");
+            }
+        } catch (err) {
+            alert("خطأ في قراءة ملف JSON!");
+        }
+    };
+    reader.readAsText(file);
+}
+
+function confirmResetDefaults() {
+    if (confirm("هل أنت تأكد تماماً من استعادة جميع البيانات الافتراضية؟ سيتم مسح أي أسئلة أو قطاعات قمت بإضافتها.")) {
+        sectors = JSON.parse(JSON.stringify(DEFAULT_SECTORS));
+        challengePools = JSON.parse(JSON.stringify(DEFAULT_CHALLENGE_POOLS));
+        localStorage.removeItem(STORAGE_PIN_KEY);
+        saveStateToStorage();
+        switchAdminTab("sectors");
+        showAdminToast("🔄 تم إعادة ضبط المصنع للبيانات الافتراضية!");
+    }
+}
+
+// --------------------------------------------------------------------------
 // Initialization
+// --------------------------------------------------------------------------
+loadStateFromStorage();
 createLEDBulbs();
 setupCanvasDPI();
 drawWheel();

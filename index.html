@@ -24,6 +24,7 @@
             </div>
         </div>
         <div class="nav-actions">
+            <button id="adminBtn" class="icon-btn" title="لوحة التحكم">⚙️</button>
             <button id="soundToggle" class="icon-btn" title="إيقاف الصوت">🔊</button>
         </div>
     </header>
@@ -138,6 +139,206 @@
             </div>
         </div>
     </div>
+
+    <!-- Admin PIN Auth Modal -->
+    <div class="modal-overlay" id="adminPinModal">
+        <div class="modal-card pin-modal-card">
+            <button class="modal-close-btn" onclick="closeAdminPinModal()">✕</button>
+            <div class="modal-header-icon">🔒</div>
+            <h2 class="modal-title">دخول لوحة التحكم</h2>
+            <p class="modal-subtitle">أدخل رمز الـ PIN لإدارة الأسئلة والقطاعات</p>
+            
+            <form id="adminPinForm" onsubmit="handlePinSubmit(event)">
+                <div class="input-group">
+                    <input type="password" id="pinInput" placeholder="أدخل رمز PIN" maxlength="10" autocomplete="off" required>
+                </div>
+                <p class="pin-error" id="pinErrorMsg"></p>
+                <div class="modal-actions-row">
+                    <button type="submit" class="modal-action-btn submit-btn">دخول 🔓</button>
+                    <button type="button" class="modal-action-btn cancel-btn" onclick="closeAdminPinModal()">إلغاء</button>
+                </div>
+                <span class="pin-hint">💡 رمز الدخول الافتراضي هو: <strong>1234</strong></span>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Panel Main Modal -->
+    <div class="modal-overlay" id="adminModal">
+        <div class="admin-modal-card">
+            <!-- Header -->
+            <div class="admin-header">
+                <div class="admin-brand">
+                    <span class="admin-icon">🛠️</span>
+                    <div>
+                        <h2>لوحة التحكم والإدارة</h2>
+                        <p>تعديل الأسئلة، الكوميديا، والقطاعات مباشرة</p>
+                    </div>
+                </div>
+                <button class="modal-close-btn" onclick="closeAdminModal()">✕</button>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="admin-tabs">
+                <button class="tab-btn active" id="tabBtnSectors" onclick="switchAdminTab('sectors')">
+                    <span>🎯</span> قطاعات العجلة
+                </button>
+                <button class="tab-btn" id="tabBtnQuestions" onclick="switchAdminTab('questions')">
+                    <span>📜</span> الأسئلة والتحديات
+                </button>
+                <button class="tab-btn" id="tabBtnSettings" onclick="switchAdminTab('settings')">
+                    <span>⚙️</span> الإعدادات والنسخ
+                </button>
+            </div>
+
+            <!-- Tab 1: Sectors Management -->
+            <div class="tab-pane active" id="tabSectors">
+                <div class="admin-section-card">
+                    <h3 class="section-title" id="sectorFormTitle">➕ إضافة قطاع جديد للعجلة</h3>
+                    <form id="sectorForm" onsubmit="handleSaveSector(event)">
+                        <input type="hidden" id="sectorEditIndex" value="-1">
+                        <div class="form-grid">
+                            <div class="input-field">
+                                <label for="sectorLabel">اسم القطاع / الفئة</label>
+                                <input type="text" id="sectorLabel" placeholder="مثال: تحدي مضحك" required>
+                            </div>
+                            <div class="input-field">
+                                <label for="sectorIcon">الأيقونة (Emoji)</label>
+                                <input type="text" id="sectorIcon" placeholder="🎭" maxlength="4" required>
+                            </div>
+                            <div class="input-field">
+                                <label for="sectorColor">لون القطاع</label>
+                                <div class="color-picker-wrapper">
+                                    <input type="color" id="sectorColor" value="#FF5252">
+                                    <input type="text" id="sectorColorText" value="#FF5252" placeholder="#FF5252">
+                                </div>
+                            </div>
+                            <div class="input-field">
+                                <label for="sectorTextColor">لون النص</label>
+                                <div class="color-picker-wrapper">
+                                    <input type="color" id="sectorTextColor" value="#FFFFFF">
+                                    <input type="text" id="sectorTextColorText" value="#FFFFFF" placeholder="#FFFFFF">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="input-field" style="margin-top: 12px;">
+                            <label for="sectorMessage">رسالة الفوز المباشرة (إذا لم تكن أسئلة)</label>
+                            <input type="text" id="sectorMessage" placeholder="مثال: ليك هدية ممتازة من اتحاد الطلاب! 🎁">
+                        </div>
+
+                        <div class="form-buttons">
+                            <button type="submit" class="btn-primary" id="saveSectorBtn">حفظ القطاع 💾</button>
+                            <button type="button" class="btn-secondary" id="cancelSectorEditBtn" onclick="resetSectorForm()" style="display:none;">إلغاء التعديل</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Sectors List -->
+                <div class="admin-section-card">
+                    <div class="section-header-row">
+                        <h3 class="section-title">📋 قطاعات العجلة الحالية</h3>
+                        <span class="badge-count" id="sectorsCountBadge">0 قطاعات</span>
+                    </div>
+                    <div class="sectors-list" id="adminSectorsList">
+                        <!-- Dynamic content -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Questions & Comedians Pool -->
+            <div class="tab-pane" id="tabQuestions">
+                <!-- Filter & Stats Header -->
+                <div class="admin-section-card">
+                    <div class="questions-filter-row">
+                        <div class="input-field">
+                            <label for="categoryFilter">اختر الفئة / القطاع:</label>
+                            <select id="categoryFilter" onchange="onCategoryFilterChange()"></select>
+                        </div>
+                        <div class="input-field">
+                            <label for="questionSearch">بحث في الأسئلة:</label>
+                            <input type="text" id="questionSearch" placeholder="ابحث بالكلمات..." oninput="renderAdminQuestions()">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Question Form -->
+                <div class="admin-section-card">
+                    <h3 class="section-title" id="questionFormTitle">➕ إضافة سؤال / تحدي جديد للفئة المحددة</h3>
+                    <form id="questionForm" onsubmit="handleSaveQuestion(event)">
+                        <input type="hidden" id="questionEditIndex" value="-1">
+                        <div class="input-field">
+                            <label for="questionTextInput">نص السؤال / التحدي الكوميدي:</label>
+                            <textarea id="questionTextInput" rows="3" placeholder="أكتب نص السؤال أو التحدي أو الموقف الكوميدي هنا..." required></textarea>
+                        </div>
+                        <div class="form-buttons">
+                            <button type="submit" class="btn-primary" id="saveQuestionBtn">إضافة السؤال ➕</button>
+                            <button type="button" class="btn-secondary" id="cancelQuestionEditBtn" onclick="resetQuestionForm()" style="display:none;">إلغاء التعديل</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Questions List -->
+                <div class="admin-section-card">
+                    <div class="section-header-row">
+                        <h3 class="section-title" id="questionsListTitle">📜 قائمة الأسئلة والتحديات</h3>
+                        <span class="badge-count" id="questionsCountBadge">0 أسئلة</span>
+                    </div>
+                    <div class="questions-list" id="adminQuestionsList">
+                        <!-- Dynamic items -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Settings & Data Management -->
+            <div class="tab-pane" id="tabSettings">
+                <!-- Change PIN Card -->
+                <div class="admin-section-card">
+                    <h3 class="section-title">🔑 تغيير رمز دخول لوحة التحكم (PIN)</h3>
+                    <form id="changePinForm" onsubmit="handleChangePin(event)">
+                        <div class="form-grid">
+                            <div class="input-field">
+                                <label for="currentPinInput">رمز PIN الحالي</label>
+                                <input type="password" id="currentPinInput" placeholder="PIN الحالي" required>
+                            </div>
+                            <div class="input-field">
+                                <label for="newPinInput">رمز PIN الجديد</label>
+                                <input type="password" id="newPinInput" placeholder="PIN الجديد (مثال: 5678)" required>
+                            </div>
+                        </div>
+                        <div class="form-buttons" style="margin-top: 12px;">
+                            <button type="submit" class="btn-primary">حفظ الرمز الجديد 🔒</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Import / Export Backup -->
+                <div class="admin-section-card">
+                    <h3 class="section-title">💾 النسخ الاحتياطي واسترجاع البيانات</h3>
+                    <p class="section-desc">يمكنك تصدير كافة القطاعات والأسئلة والتحديات إلى ملف JSON للنسخ الاحتياطي أو الاسترجاع في جهاز آخر.</p>
+                    <div class="backup-buttons-row">
+                        <button class="btn-primary backup-btn" onclick="exportDataJSON()">
+                            <span>📥</span> تصدير البيانات (JSON)
+                        </button>
+                        <label class="btn-secondary backup-btn file-upload-label">
+                            <span>📤</span> استيراد بيانات (JSON)
+                            <input type="file" id="importJsonInput" accept=".json" onchange="importDataJSON(event)" style="display:none;">
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Reset Defaults -->
+                <div class="admin-section-card danger-zone">
+                    <h3 class="section-title text-danger">⚠️ استعادة البيانات الافتراضية</h3>
+                    <p class="section-desc">سيؤدي هذا الإجراء إلى مسح كافة التعديلات والأسئلة المضافة واستعادة الأسئلة والقطاعات الأصلية للعبة.</p>
+                    <button class="btn-danger" onclick="confirmResetDefaults()">إعادة ضبط المصنع 🔄</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Admin Notification Toast -->
+    <div class="admin-toast" id="adminToast"></div>
 
     <script src="script.js"></script>
 </body>
